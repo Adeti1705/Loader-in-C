@@ -44,9 +44,12 @@ void load_and_run_elf(char **exe)
   Elf32_Off prog_offset = ehdr->e_phoff;
   phdr = (Elf32_Phdr *)heap + prog_offset;
   uint16_t prog_num = ehdr->e_phnum;
+  unsigned int entrypoint = ehdr->e_entry;
   Elf32_Phdr *temp = phdr;
   int i = 0;
+  void *entry;
   void* virtual_mem;
+
   while (i < prog_num)
   {
     if (temp->p_type == PT_LOAD)
@@ -54,16 +57,32 @@ void load_and_run_elf(char **exe)
       // 3. Allocate memory of the size "p_memsz" using mmap function
       //    and then copy the segment content
       virtual_mem = mmap(NULL, temp->p_memsz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-     
-      
+      memcpy(virtual_mem,heap,temp->p_offset,temp->p_memsz);
+      // 4. Navigate to the entrypoint address into the segment loaded in the memory in above step
+      entry = virtual_mem + (entrypoint - temp->p_vaddr);
+      if (entry>virtual_mem && entry<=virtual_mem+temp->p_memsz)
+      {
+        break;
+      }
     }
+    i++;
+    temp++;
   }
-
-  // 4. Navigate to the entrypoint address into the segment loaded in the memory in above step
-  // 5. Typecast the address to that of function pointer matching "_start" method in fib.c.
+  if (!entry){
+    // 5. Typecast the address to that of function pointer matching "_start" method in fib.c.
+    int(*_start)() = (int(*)())entry;
+  
   // 6. Call the "_start" method and print the value returned from the "_start"
   int result = _start();
   printf("User _start return value = %d\n", result);
+  }
+  else
+  {
+    printf("Entrypoint not found in the PT_LOAD segment\n");
+    free(heap);
+    exit(1);
+  }
+  close(fd);
 }
 
 int main(int argc, char **argv)
@@ -74,6 +93,13 @@ int main(int argc, char **argv)
     exit(1);
   }
   // 1. carry out necessary checks on the input ELF file
+  FILE *elfFile = fopen(argv[1], "rb");
+  if (!elfFile)
+  {
+      printf("Error: Unable to open ELF file.\n");
+      exit(1);
+  }
+  fclose(elfFile);
   // 2. passing it to the loader for carrying out the loading/execution
   load_and_run_elf(argv[1]);
   // 3. invoke the cleanup routine inside the loader
