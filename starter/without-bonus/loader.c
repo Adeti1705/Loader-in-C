@@ -8,7 +8,11 @@ int fd;
  * release memory and other cleanups
  */
 void loader_cleanup() {
-  
+  free(ehdr);
+  free(phdr);
+  ehdr=nullptr;
+  phdr=nullptr;
+  close(fd);
 }
 
 /*
