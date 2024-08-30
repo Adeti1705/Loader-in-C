@@ -20,7 +20,20 @@ void loader_cleanup() {
  */
 void load_and_run_elf(char** exe) {
   fd = open(argv[1], O_RDONLY);
+  if(fd==-1) {
+    printf("Error in opening the file %s",argv[1]);
+    exit(1);
+  }
+  off_t f_size=lseek(fd,0,SEEK_END);
+  lseek(fd,0,SEEK_SET);
+  char * heap=(char *) malloc(f_size);
   // 1. Load entire binary content into the memory from the ELF file.
+  ssize_t bytes_read=read(fd,heap,f_size);
+  if(bytes_read!=f_size) {
+    printf("Error in reading the file %s",argv[1]);
+    exit(1);
+  }
+
   // 2. Iterate through the PHDR table and find the section of PT_LOAD 
   //    type that contains the address of the entrypoint method in fib.c
   // 3. Allocate memory of the size "p_memsz" using mmap function 
