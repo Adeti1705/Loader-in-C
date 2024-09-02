@@ -9,7 +9,7 @@ int fd;
  */
 void loader_cleanup()
 {
-  // no need to free the pointer as it just pointing to null will be enough
+  // no need to free the pointer as just pointing to null will be enough
   ehdr = NULL;
   phdr = NULL;
 }
@@ -44,11 +44,11 @@ void load_and_run_elf(char **exe)
   uint16_t prog_num = ehdr->e_phnum;
   unsigned int entrypoint = ehdr->e_entry;
   Elf32_Phdr *temp = phdr;
-  int i = 0;
+  int iter = 0;
   void *entry = NULL;
   void *virtual_mem = NULL;
 
-  while (i < prog_num)
+  for (int iter=0; iter<prog_num;iter++)
   {
     if (temp->p_type == PT_LOAD)
     {
@@ -57,10 +57,10 @@ void load_and_run_elf(char **exe)
       virtual_mem = mmap(NULL, temp->p_memsz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
       if (virtual_mem == MAP_FAILED)
       {
-        perror("Error: Memory mapping failed");
+        printf("Error in memory mapping");
         exit(1);
       }
-      memcpy(virtual_mem, heap, temp->p_offset, temp->p_memsz);
+      memcpy(virtual_mem, heap+temp->p_offset, temp->p_memsz);
       // 4. Navigate to the entrypoint address into the segment loaded in the memory in above step
       entry = virtual_mem + (entrypoint - temp->p_vaddr);
       if (entry > virtual_mem && entry <= virtual_mem + temp->p_memsz)
@@ -68,7 +68,6 @@ void load_and_run_elf(char **exe)
         break;
       }
     }
-    i++;
     temp++;
   }
   if (entry)
@@ -98,14 +97,22 @@ int main(int argc, char **argv)
   }
   // 1. carry out necessary checks on the input ELF file
   FILE *elfFile = fopen(argv[1], "rb");
-  if (!elfFile)
-  {
-    printf("Error: Unable to open ELF file.\n");
-    exit(1);
-  }
-  fclose(elfFile);
+
+  unsigned char magic_number[4];
+  
+    if (fread(magic_number, 1, 4, elfFile) != 4) {
+        printf("Invalid file");
+        fclose(elfFile);
+        exit(1);
+    }
+  
+    if (magic_number[0] != 0x7F || magic_number[1] != 'E' || magic_number[2] != 'L' || magic_number[3] != 'F') {
+        printf("Not a valid ELF file.");
+        exit(1);
+    } 
+    fclose(elfFile);
   // 2. passing it to the loader for carrying out the loading/execution
-  load_and_run_elf(argv[1]);
+  load_and_run_elf(&argv[1]);
   // 3. invoke the cleanup routine inside the loader
   loader_cleanup();
   return 0;
